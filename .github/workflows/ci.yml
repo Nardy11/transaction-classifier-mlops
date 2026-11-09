@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: pip install -r requirements.txt -e ".[dev]"
+      - name: Lint (ruff)
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Tests (cleaning, pipeline, API, JS/Python parity)
+        run: pytest -v
+      - name: Smoke-train on the bundled sample (with MLflow)
+        run: |
+          python -m txclf train --config configs/ci.yaml
+          python -m txclf predict --model build/ci/model.joblib "jumbo bag red retrospot"
+          python -m txclf drift data/sample/transactions_sample.csv --model build/ci/model.joblib --out build/ci/drift.json
+          python -m txclf export-web --model build/ci/model.joblib --out build/ci/model.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-smoke-run
+          path: |
+            build/ci/reports
+            build/ci/drift.json
