@@ -1,0 +1,27 @@
+# Full training run on the Kaggle dataset (downloaded with kagglehub when data.path is null).
+seed: 42
+data:
+  path: null
+  kaggle_dataset: vipin20/transaction-data
+  kaggle_file: transaction_data.csv
+  remove_outliers: true
+features:
+  max_features: 5000   # notebook value
+  ngram_max: 2
+  svd_components: 150  # notebook value
+clustering:
+  n_clusters: 56       # chosen in the notebook from the silhouette / elbow curves
+  n_init: 10
+  name_terms: 3
+classifier:
+  C: 1.0
+  max_iter: 2000
+  class_weight: balanced
+eval:
+  test_size: 0.2
+  hand_labels: data/hand_labels.csv
+output:
+  model_path: models/model.joblib
+  reports_dir: reports
+  mlflow_uri: mlruns
+  experiment: transaction-classifier

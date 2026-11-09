@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "txclf"
+version = "1.0.0"
+description = "Transaction categorisation: TF-IDF + clustering + classifier, with MLflow, FastAPI and drift checks."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Nardy Attaalla" }]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "scipy>=1.11",
+  "scikit-learn==1.9.1",
+  "joblib>=1.3",
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+train = ["mlflow>=3.0", "matplotlib>=3.8", "kagglehub>=0.3"]
+serve = ["fastapi>=0.110", "uvicorn>=0.29"]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

@@ -1,0 +1,24 @@
+# Smoke-test run on the bundled 3,000-row sample (CI and tests). Seconds, not minutes.
+seed: 42
+data:
+  path: data/sample/transactions_sample.csv
+  remove_outliers: true
+features:
+  max_features: 800
+  ngram_max: 2
+  svd_components: 30
+clustering:
+  n_clusters: 8
+  n_init: 3
+  name_terms: 3
+classifier:
+  max_iter: 1000
+  class_weight: balanced
+eval:
+  test_size: 0.2
+  hand_labels: null
+output:
+  model_path: build/ci/model.joblib
+  reports_dir: build/ci/reports
+  mlflow_uri: build/ci/mlruns
+  experiment: transaction-classifier-ci
