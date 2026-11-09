@@ -1,0 +1,140 @@
+{
+  "n_rows": 8,
+  "drift_detected": true,
+  "failed_checks": [
+    "oov_token_rate_increase",
+    "empty_row_rate",
+    "term_js_distance",
+    "category_psi"
+  ],
+  "vocabulary": {
+    "oov_token_rate": 0.6296,
+    "train_oov_token_rate": 0.0286,
+    "empty_row_rate": 0.25,
+    "term_js_distance": 0.9281,
+    "top_unseen_tokens": [
+      {
+        "token": "uber",
+        "count": 2
+      },
+      {
+        "token": "trip",
+        "count": 1
+      },
+      {
+        "token": "help",
+        "count": 1
+      },
+      {
+        "token": "netflix",
+        "count": 1
+      },
+      {
+        "token": "monthly",
+        "count": 1
+      },
+      {
+        "token": "tesco",
+        "count": 1
+      },
+      {
+        "token": "stores",
+        "count": 1
+      },
+      {
+        "token": "2041",
+        "count": 1
+      },
+      {
+        "token": "mktplace",
+        "count": 1
+      },
+      {
+        "token": "pmts",
+        "count": 1
+      },
+      {
+        "token": "spotify",
+        "count": 1
+      },
+      {
+        "token": "premium",
+        "count": 1
+      },
+      {
+        "token": "fuel",
+        "count": 1
+      },
+      {
+        "token": "station",
+        "count": 1
+      },
+      {
+        "token": "22",
+        "count": 1
+      }
+    ]
+  },
+  "categories": {
+    "psi": 4.8157,
+    "js_distance": 0.732,
+    "largest_shifts": [
+      {
+        "category": "pink / white / garden",
+        "train_share": 0.2168,
+        "batch_share": 0.75
+      },
+      {
+        "category": "mug / coffee / design",
+        "train_share": 0.0154,
+        "batch_share": 0.125
+      },
+      {
+        "category": "retrospot / red retrospot / bag",
+        "train_share": 0.0326,
+        "batch_share": 0.125
+      },
+      {
+        "category": "set / paper / tins",
+        "train_share": 0.0758,
+        "batch_share": 0.0
+      },
+      {
+        "category": "heart / small / pink",
+        "train_share": 0.0439,
+        "batch_share": 0.0
+      },
+      {
+        "category": "box / trinket / tissue",
+        "train_share": 0.0307,
+        "batch_share": 0.0
+      },
+      {
+        "category": "vintage / vintage christmas / paisley",
+        "train_share": 0.0303,
+        "batch_share": 0.0
+      },
+      {
+        "category": "jumbo / jumbo bag / bag vintage",
+        "train_share": 0.0271,
+        "batch_share": 0.0
+      },
+      {
+        "category": "metal sign / toilet / singing metal",
+        "train_share": 0.0265,
+        "batch_share": 0.0
+      },
+      {
+        "category": "lunch / lunch bag / design",
+        "train_share": 0.0233,
+        "batch_share": 0.0
+      }
+    ]
+  },
+  "thresholds": {
+    "oov_token_rate_increase": 0.1,
+    "empty_row_rate": 0.05,
+    "term_js_distance": 0.3,
+    "category_psi": 0.2
+  }
+}

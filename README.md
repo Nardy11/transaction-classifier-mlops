@@ -1,185 +1,206 @@
-## Transaction Category Prediction (ML Final Project)
-By Nardy Attaalla – ReDI School Machine Learning Course  
-Project Files Reference: FINAL PROJECT Presentation
+# Transaction classifier: an MLOps project
 
-## 📌 1. Project Overview
-This project automatically classifies customer transactions into product categories using a hybrid approach combining:
+Predicts the product category of a retail transaction from its free-text description. The pipeline is TF-IDF, then TruncatedSVD, then KMeans pseudo-labels, then logistic regression. It is packaged as a reproducible pipeline with MLflow tracking, a CLI, a FastAPI service, a Docker image, CI, a drift check and a demo that runs the model in your browser.
 
-- NLP (TF-IDF)
-- Unsupervised Learning (KMeans Clustering)
-- Supervised Learning (Logistic Regression)
+**[▶ Live demo](https://nardy11.github.io/transaction-classifier-mlops/)**: type a description and get the category and its top-3 probabilities. The model runs in JavaScript, with no server.
 
-The dataset contains retail transactions but no category labels, so the solution generates its own categories through clustering, then trains a classifier to predict them for new unseen transactions.  
-This reflects real applications in fintech, banking, and expense-tracking apps such as Revolut, Monzo, and N26.
+[![CI](https://github.com/Nardy11/transaction-classifier-mlops/actions/workflows/ci.yml/badge.svg)](https://github.com/Nardy11/transaction-classifier-mlops/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.9-orange.svg)
+![MLflow](https://img.shields.io/badge/tracked%20with-MLflow-0194E2.svg)
 
-## 📌 2. Problem Statement
-Retail transaction data rarely comes with clean product categories.  
-The goal of this project is to:
+[![The in-browser demo](reports/figures/demo.png)](https://nardy11.github.io/transaction-classifier-mlops/)
 
-- Discover meaningful product categories automatically (unsupervised clustering)
-- Use these discovered categories to train a classifier
-- Predict categories for new transactions in real time
+## What it does
 
-This helps financial applications summarize spending, detect unusual purchases, and assist users in money management.
+Bank and expense apps show spending by category, but raw transaction data rarely comes with one. This project starts from roughly one million unlabelled retail transactions and does the following:
 
-## 📌 3. Dataset Information
-**Source:** Kaggle – Transaction Data  
-https://www.kaggle.com/datasets/vipin20/transaction-data
+1. **Cleans** the descriptions and the numeric columns: duplicates, nulls, symbols and IQR outliers.
+2. **Discovers categories** by clustering the TF-IDF/SVD vectors of the descriptions into 56 groups. Each group is named automatically after its heaviest terms, for example `bottle / hot / water`.
+3. **Trains a classifier** to predict those groups for new, unseen descriptions.
+4. **Serves** the classifier as a batch REST API, a Docker image, a static web page and a Gradio Space.
+5. **Watches inputs** with a drift report that compares a new batch with the training data.
 
-**Rows:** ~540K
+The original research notebook from the ReDI School course is kept in [`notebooks/`](notebooks/Transaction_Category_Prediction_ML.ipynb). This repository turns it into a pipeline that can be run, tested and deployed.
 
-**Columns:**
-- UserId
-- ItemDescription
-- NumberOfItemsPurchased
-- CostPerItem
-- Country
+## Architecture
 
-**Challenges:**
-- No category labels
-- Duplicate entries
-- Outliers
-- Very skewed country distribution (90% UK)
-- Text is messy, requires NLP preprocessing
-
-## 📌 4. Installation & Requirements
-**Required Libraries**
-```bash
-pandas
-numpy
-scikit-learn
-matplotlib
-seaborn
-scipy
+```mermaid
+flowchart LR
+    K[(Kaggle dataset<br/>CC0, ~1.08M rows)] -->|kagglehub| D[data.py<br/>load + clean]
+    S[(3k-row sample<br/>in repo)] -.->|CI| D
+    D --> F[features.py<br/>TF-IDF 1-2 grams → SVD 150]
+    F --> C[clustering.py<br/>KMeans k=56 → pseudo-labels + names]
+    C --> T[classifier.py<br/>LogisticRegression]
+    T --> E[evaluate.py<br/>held-out + hand labels + plots]
+    E --> M[(MLflow<br/>params · metrics · figures · model)]
+    T --> A[model.joblib<br/>GitHub Release]
+    A --> API[FastAPI /predict /health<br/>Docker]
+    A --> X[export.py → model.json]
+    X --> P[GitHub Pages demo<br/>same maths in JS]
+    X --> HF[Gradio Space]
+    A --> DR[drift.py<br/>vocabulary + category drift → JSON]
+    N[(new batch)] --> DR
 ```
 
-📌**Install Libraries**
-- pandas  
-- numpy  
-- scikit-learn  
-- matplotlib  
-- seaborn  
-- scipy  
+Configuration is in YAML: [`configs/default.yaml`](configs/default.yaml) for the full run and [`configs/ci.yaml`](configs/ci.yaml) for the smoke run. Each `train` run logs its config, metrics, figures, the joblib artifact and an MLflow sklearn model to a local `mlruns/` store (SQLite, git-ignored).
 
-## 📌 5. How to Run the Project
-**Step 1** — Open the Notebook
+## Results
+
+All numbers come from `python -m txclf train --config configs/default.yaml` on the full Kaggle file. They are also in [`reports/metrics.json`](reports/metrics.json).
+
+| | |
+|---|---|
+| Raw rows | 1,083,818 |
+| Rows after cleaning (dedupe, nulls, IQR outliers) | 421,093 |
+| Distinct descriptions after cleaning | **3,757** |
+| TF-IDF vocabulary / SVD components (explained variance) | 5,000 / 150 (33.8%) |
+| KMeans clusters / silhouette | 56 / 0.106 |
+| Largest cluster | 21.9% of rows (`pink / white / garden`, a catch-all) |
+
+**Classifier against the KMeans pseudo-labels.** These descriptions were split 80/20, so every test description is unseen:
+
+| Split | Accuracy | Macro F1 | Row-weighted accuracy |
+|---|---|---|---|
+| Descriptions seen in training | 99.3% | 99.1% | 99.8% |
+| **Held-out descriptions** | **97.1%** | **94.6%** | **95.9%** |
+| Held-out, classifier trained on shuffled labels (baseline) | 2.1% | | |
+
+**What these numbers mean.** The roughly one million rows are repeat purchases of only 3,757 distinct product descriptions. A row-level train/test split, which the notebook used and which reported about 99%, puts the same description in both train and test. This repo therefore splits by description. More importantly, the labels are KMeans clusters built from the same TF-IDF/SVD features the classifier uses. High accuracy here means *the classifier reproduces the clustering consistently*, not that the categories are correct.
+
+**Hand-labelled check (n = 50).** To get a small real check, 50 descriptions were drawn at random, weighted by row frequency, and each was given the cluster name that fits best by reading the text alone. The model's predictions were not shown during labelling. The labelling was done during this refactor by the AI assistant that built the pipeline: one labeller, with no second review. Treat it as indicative. The file is [`data/hand_labels.csv`](data/hand_labels.csv).
+
+| | |
+|---|---|
+| Descriptions where none of the 56 categories fits (for example "pick up sticks game", "bottle opener") | 16 / 50 |
+| Top-1 correct, all 50 | 42% |
+| **Top-1 correct, where a category fits (n = 34)** | **62%** |
+| **Top-3 contains the right category (n = 34)** | **85%** |
+
+Most top-1 misses fall between near-duplicate clusters: two Christmas clusters, two "tins" clusters, two "card" clusters and two "retrospot" clusters. Some fall into the catch-all `pink / white / garden`. The weak link is the clustering, not the classifier. That points to the next improvements: fewer or merged clusters, better text embeddings, and a properly labelled evaluation set.
+
+<p>
+<img src="reports/figures/confusion_matrix.png" width="49%" alt="Confusion matrix on held-out descriptions">
+<img src="reports/figures/clusters.png" width="49%" alt="Cluster map and cluster sizes">
+</p>
+
+The browser demo runs the same full model, not a reduced copy. TF-IDF, SVD and logistic regression are linear up to the softmax, so the SVD and the classifier weights fold into one 56 × 5,000 matrix, which is stored as int16. The result is an 860 KB JSON file (460 KB gzipped). A test checks that JavaScript and Python agree on 24 inputs: same top-1, and probabilities within 0.002.
+
+## Model card
+
+| | |
+|---|---|
+| **Model** | TF-IDF (1-2 grams, English stop words, 5,000 terms) → TruncatedSVD (150) → multinomial logistic regression (balanced class weights) over 56 KMeans clusters |
+| **Input** | One free-text item description, for example `WHITE HANGING HEART T-LIGHT HOLDER` |
+| **Output** | Category name, probability, top-k list, and `known_terms` (vocabulary terms matched; 0 means the output is only the prior) |
+| **Training data** | [Transaction Data](https://www.kaggle.com/datasets/vipin20/transaction-data) by vipin20 on Kaggle, licence **CC0 Public Domain**. About 1.08M rows from one UK online gift retailer, roughly 90% UK customers. Only `ItemDescription` is used by the model. The full dataset is not committed; [`data/sample/`](data/sample) holds a 3,000-row random sample for CI. |
+| **Labels** | No ground truth. Categories are KMeans clusters, named automatically from their top terms. |
+| **Evaluation** | Consistency with the pseudo-labels on held-out descriptions (97.1% accuracy), plus a small hand-labelled check (62% top-1 / 85% top-3 where a category fits). See [Results](#results). |
+| **Intended use** | Demonstrating an end-to-end MLOps workflow; grouping descriptions from a similar product catalogue. |
+| **Not suitable for** | Categorising bank or card transactions in general (merchant names, groceries, travel). Those words are mostly out of vocabulary, and the drift check flags them. Not for any decision about a person. |
+| **Known limitations** | One retailer and one language. Several near-duplicate clusters plus one large catch-all. Cluster names are term lists, not curated labels. Retraining with a different config or seed changes the label set. |
+| **Differences from the notebook** | The model uses the description only. The notebook also fed scaled quantity and price columns, but text carried the signal (about 28% accuracy without it). Models are fitted on distinct descriptions weighted by their row counts, not on repeated rows. Rows with an empty description are dropped instead of forming a "nan" cluster. Cluster names are generated, not hand-typed. |
+| **Ethics** | The data is heavily skewed to UK customers. Nothing in the data identifies a person beyond an opaque `UserId`, which the model does not use. |
+
+## Monitoring: drift check
+
 ```bash
-jupyter notebook Transaction_Category_Prediction_ML.ipynb
+python -m txclf drift new_batch.csv --column ItemDescription --out drift.json [--fail-on-drift]
 ```
 
-**Step 2** — Follow the Sections in Order
-1. Load & clean the data
-2. Run EDA visualizations
-3. Run TF-IDF + SVD
-4. Generate clusters (K=56)
-5. Assign category names to clusters
-6. Train the classification model
-7. Evaluate and visualize results
+The training reference is stored inside the model artifact. The report compares the batch with that reference:
 
-## 📌 6. Data Cleaning & Preprocessing
-Steps performed:
-- Removed duplicates
-- Removed nulls
-- Fixed invalid values (UserId -1 → 1)
-- Cleaned text (lowercase, remove symbols/spaces)
-- Feature engineering:
-  - TotalCost = NumberOfItemsPurchased * CostPerItem
-  - Label-encoded Country
-  - Removed outliers using IQR
-  - Normalized & standardized numerical values
+- **Vocabulary**: the share of tokens the model has never seen (the out-of-vocabulary rate), compared with training; the share of rows with no known term; the Jensen-Shannon distance between term distributions; and the most frequent unseen tokens.
+- **Predictions**: the Population Stability Index and the JS distance between the predicted category distribution of the batch and of the training data, plus the 10 largest category shifts.
 
-All cleaning is saved directly to the updated `df_new` dataframe.
+Default thresholds: an OOV increase above 0.10, empty rows above 5%, term JS above 0.30, or category PSI above 0.20. Any one of these sets `drift_detected: true`. With `--fail-on-drift`, the command exits 1, so it can gate a scheduled job. Two examples:
 
-## 📌 7. Exploratory Data Analysis (EDA)
-EDA included:
-- Distribution plots for numeric columns
-- Boxplots of numeric features by country
-- Outlier visualization
-- Observation that no strong correlation exists between numeric features
-- Text length distribution removed because not useful
+- [`reports/drift_sample.json`](reports/drift_sample.json): the 3,000-row in-distribution sample. No drift: OOV 3.3% against 2.9% at training, PSI 0.03.
+- [`reports/drift_foreign.json`](reports/drift_foreign.json): card-statement lines such as `UBER TRIP` and `NETFLIX.COM`. All four checks fire: OOV 63%, 25% of rows have no known term, PSI 4.8.
 
-EDA confirmed that `ItemDescription` is the main signal in the dataset.
+## Quickstart
 
-## 📌 8. Modeling Approach
-**Step 1** — Text Vectorization  
-Used TF-IDF with bigrams (1–2 grams) and `max_features=5000`.
+```bash
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt -e ".[dev]"
 
-**Step 2** — Dimensionality Reduction  
-Applied TruncatedSVD (150 components) for speeding up clustering.
+# train on the full dataset (kagglehub downloads it; no Kaggle login needed for this public dataset)
+python -m txclf train                                  # ~1-2 min on a laptop
+mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db   # browse runs at http://127.0.0.1:5000
 
-**Step 3** — Unsupervised Clustering
-- Used KMeans with 56 clusters
-- Determined using:
-  - Silhouette Score curve
-  - Elbow Method curve
-- Extracted 8 representative samples per cluster
-- Assigned semantic category names manually
+# or skip training: download the released model
+curl -L -o models/model.joblib --create-dirs \
+  https://github.com/Nardy11/transaction-classifier-mlops/releases/download/v1.0.0/model.joblib
 
-**Step 4** — Supervised Classification
-- Model: Logistic Regression (balanced, max_iter=2000)
-- Input: Combined TF-IDF+SVD (text) + scaled numeric features
-- Achieved:
-  - 99% accuracy
-  - Excellent macro F1 score
-  - Proper performance on large dataset (~540K rows)
+python -m txclf predict "jumbo bag red retrospot" "regency cakestand 3 tier"
+python -m txclf evaluate --hand-labels data/hand_labels.csv
+python -m txclf export-web                             # rebuild docs/model.json for the demo
+```
 
-## 📌 9. Results
-- Model achieved ~99% accuracy when text features included.
-- Without `ItemDescription` → accuracy dropped to ~28%, proving text is essential.
-- Confusion matrix shows strong separation between categories.
+**Serve:**
 
-This demonstrates the effectiveness of the hybrid pipeline:  
-**NLP + Clustering + Logistic Regression**
+```bash
+uvicorn txclf.api:app --port 8000          # TXCLF_MODEL=models/model.joblib by default
+curl -X POST localhost:8000/predict -H "content-type: application/json" \
+  -d '{"descriptions": ["jumbo bag red retrospot", "alarm clock bakelike green"], "top_k": 3}'
+curl localhost:8000/health
+```
 
-## Evaluation Caveat
+**Docker** (the image downloads the v1.0.0 model at build time; pass `--build-arg MODEL_URL=...` to serve your own):
 
-The reported ~99% classification accuracy measures how well Logistic Regression reproduces the categories generated by the K-Means clustering step. These are **pseudo-labels**, not independently verified product-category ground truth.
+```bash
+docker build -t txclf .
+docker run -p 8000:8000 txclf
+```
 
-Therefore, the result demonstrates consistency with the project’s clustering scheme rather than validated real-world category accuracy. A stronger future evaluation would compare against manually reviewed labels on a held-out dataset and report cluster-quality metrics alongside classifier metrics.
+> `model.joblib` is a pickle. Only load artifacts you trust. The web demo and the Space use the plain-JSON export instead.
 
-## 📌 10. Ethical Considerations
-- The dataset is extremely biased toward UK transactions (90%)
-- This may cause:
-  - Overconfidence for UK-based patterns
-  - Poor generalization to other countries
-- Manual category creation may introduce human bias
-- Missing columns (merchant, channel, timestamp) limit fairness and diversity
+**Hugging Face Space.** [`space/`](space) is a ready Gradio app with the Space frontmatter. It uses the same `model.json` as the web demo and needs only numpy. To deploy it:
 
-**Bias Mitigation Suggestions**
-- Add more countries
-- Add merchant/store metadata
-- Use balanced sampling
-- Use multilingual NLP
-- Use model explainability to detect unwanted bias
+1. Create a free account at huggingface.co, then **New Space** → SDK **Gradio** → name it `transaction-classifier`.
+2. Copy the contents of `space/` into the Space repository, and copy `docs/model.json` next to `app.py`. If you skip that, the app fetches the file from GitHub Pages at start-up.
+3. `git add . && git commit -m "Deploy" && git push`. The Space builds and goes live at `https://huggingface.co/spaces/<user>/transaction-classifier`.
 
-## 📌 11. Limitations
-- Heavy reliance on `ItemDescription` → fragile if text is missing
-- Outliers remain even after IQR filtering
-- Manual labeling of clusters required
-- No time-series information
-- No user behavioral features
+## Tests and CI
 
-## 📌 12. Future Work
-- Use Deep Learning (BERT, DistilBERT) for better text understanding
-- Add more features (merchant, timestamp, product brand)
-- Use time-series forecasting to detect seasonal purchases
-- Automate cluster naming using LLM or topic modeling
-- Build a simple API to classify new transactions
+`pytest` runs 22 tests. They cover text and row cleaning, the full pipeline on the 3,000-row sample (metrics, predict, save and load, drift), the API (health, batch predict, validation, missing model returns 503), and JavaScript/Python parity on the CI model and on the released model when it is present. On every push, [GitHub Actions](.github/workflows/ci.yml) runs `ruff check`, `ruff format --check` and the tests. It then smoke-trains on the sample with MLflow, runs `predict`, `drift` and `export-web`, and uploads the reports as a build artifact.
 
-## 📌 13. Project Files Included
-- Jupyter Notebook: `Transaction_Category_Prediction_ML.ipynb`
-- Cleaned Dataset / Preprocessed version
-- Final Presentation Slides (PPTX) — FINAL PROJECT 08e16aac-4046-4d83-a9a7-9554c00…
-- This `README.md`
-- Any generated visualizations
+## Project structure
 
-## 📌 14. Acknowledgements
-- Dataset by vipin20 on Kaggle
-- ReDI School Machine Learning Course
-- Scikit-Learn Documentation
-- ChatGPT used for brainstorming & debugging assistance (as required by academic honesty rules)
+```
+├── configs/               default.yaml (full run), ci.yaml (smoke run)
+├── src/txclf/
+│   ├── data.py            load (CSV or kagglehub) + cleaning
+│   ├── features.py        TF-IDF → SVD pipeline
+│   ├── clustering.py      KMeans pseudo-labels + automatic names
+│   ├── classifier.py      logistic regression
+│   ├── evaluate.py        metrics, hand-label check, figures
+│   ├── train.py           orchestration + MLflow logging
+│   ├── model.py           TxModel artifact + predict()
+│   ├── drift.py           drift report
+│   ├── export.py          model.json for the browser / Space
+│   ├── api.py             FastAPI app
+│   └── cli.py             python -m txclf train|evaluate|predict|export-web|drift
+├── tests/                 pytest suite (incl. JS parity)
+├── docs/                  GitHub Pages demo: index.html, txclf.js, model.json
+├── space/                 Hugging Face Gradio Space
+├── data/                  sample/ (3k CC0 rows), hand_labels.csv
+├── reports/               metrics.json, categories.json, drift examples, figures/
+├── notebooks/             original research notebook (Colab) + .py export
+├── scripts/               web_predict.mjs (Node runner for the parity test)
+├── Dockerfile
+└── .github/workflows/ci.yml
+```
+
+The notebook [`notebooks/Transaction_Category_Prediction_ML.ipynb`](notebooks/Transaction_Category_Prediction_ML.ipynb) is the original exploration: EDA, the silhouette and elbow search that picked k = 56, hand-named clusters, and the numeric-feature ablation. The final course presentation (PPTX) is attached to the [v1.0.0 release](https://github.com/Nardy11/transaction-classifier-mlops/releases/tag/v1.0.0).
+
+## Credits
+
+- Built by **Nardy Attaalla** as the final project of the [ReDI School](https://www.redi-school.org/) Machine Learning course, then rebuilt as an MLOps pipeline.
+- Dataset: [Transaction Data](https://www.kaggle.com/datasets/vipin20/transaction-data) by Vipin Kumar (vipin20) on Kaggle, CC0 Public Domain.
+- Built with scikit-learn, MLflow, FastAPI and Gradio. ChatGPT was used for brainstorming and debugging in the original notebook, as the course's academic-honesty rules required. Claude helped build the MLOps refactor.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
-
+MIT. See [LICENSE](LICENSE).

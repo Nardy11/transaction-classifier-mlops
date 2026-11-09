@@ -1,0 +1,135 @@
+{
+  "n_rows": 3000,
+  "drift_detected": false,
+  "failed_checks": [],
+  "vocabulary": {
+    "oov_token_rate": 0.0325,
+    "train_oov_token_rate": 0.0286,
+    "empty_row_rate": 0.0007,
+    "term_js_distance": 0.2362,
+    "top_unseen_tokens": [
+      {
+        "token": "ornament",
+        "count": 13
+      },
+      {
+        "token": "cakestand",
+        "count": 10
+      },
+      {
+        "token": "11",
+        "count": 8
+      },
+      {
+        "token": "pc",
+        "count": 8
+      },
+      {
+        "token": "rex",
+        "count": 7
+      },
+      {
+        "token": "cash",
+        "count": 7
+      },
+      {
+        "token": "cars",
+        "count": 7
+      },
+      {
+        "token": "bread",
+        "count": 7
+      },
+      {
+        "token": "spinning",
+        "count": 6
+      },
+      {
+        "token": "tops",
+        "count": 6
+      },
+      {
+        "token": "nancy",
+        "count": 6
+      },
+      {
+        "token": "chilli",
+        "count": 5
+      },
+      {
+        "token": "beurre",
+        "count": 5
+      },
+      {
+        "token": "penny",
+        "count": 5
+      },
+      {
+        "token": "croquet",
+        "count": 5
+      }
+    ]
+  },
+  "categories": {
+    "psi": 0.0288,
+    "js_distance": 0.0719,
+    "largest_shifts": [
+      {
+        "category": "pink / white / garden",
+        "train_share": 0.2168,
+        "batch_share": 0.2273
+      },
+      {
+        "category": "metal sign / toilet / singing metal",
+        "train_share": 0.0265,
+        "batch_share": 0.0197
+      },
+      {
+        "category": "retrospot / red retrospot / bag",
+        "train_share": 0.0326,
+        "batch_share": 0.0393
+      },
+      {
+        "category": "box / trinket / tissue",
+        "train_share": 0.0307,
+        "batch_share": 0.024
+      },
+      {
+        "category": "light / holder / hanging",
+        "train_share": 0.0208,
+        "batch_share": 0.016
+      },
+      {
+        "category": "birthday / card / happy",
+        "train_share": 0.0105,
+        "batch_share": 0.0153
+      },
+      {
+        "category": "bag / jumbo / gift bag",
+        "train_share": 0.0155,
+        "batch_share": 0.011
+      },
+      {
+        "category": "card / holder / birthday card",
+        "train_share": 0.009,
+        "batch_share": 0.005
+      },
+      {
+        "category": "regency / plate / tea",
+        "train_share": 0.0127,
+        "batch_share": 0.0163
+      },
+      {
+        "category": "clock / alarm clock / clock bakelike",
+        "train_share": 0.0095,
+        "batch_share": 0.006
+      }
+    ]
+  },
+  "thresholds": {
+    "oov_token_rate_increase": 0.1,
+    "empty_row_rate": 0.05,
+    "term_js_distance": 0.3,
+    "category_psi": 0.2
+  }
+}
