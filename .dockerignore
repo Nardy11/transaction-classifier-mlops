@@ -1,0 +1,11 @@
+.venv
+.git
+mlruns
+models
+build
+notebooks
+docs
+reports
+data
+space
+tests
