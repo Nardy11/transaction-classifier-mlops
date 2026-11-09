@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transaction classifier</title>
+<meta name="description" content="Type a retail transaction description and get its predicted category. The TF-IDF, SVD and logistic regression maths run in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f5f1; --surface: #ffffff; --ink: #1b1d21; --muted: #5d6169; --line: #e2e0d9;
+  --accent: #1f5f8b; --accent-soft: #e3eef6; --bar: #1f5f8b; --bar-2: #8fb3cf; --warn: #8a5a00; --warn-bg: #fdf3dc;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121417; --surface: #1a1d21; --ink: #e9e7e2; --muted: #a2a6ad; --line: #2b2f35;
+    --accent: #7fb6dd; --accent-soft: #1d2a35; --bar: #7fb6dd; --bar-2: #3f5f78; --warn: #f0c46b; --warn-bg: #2d2615;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121417; --surface: #1a1d21; --ink: #e9e7e2; --muted: #a2a6ad; --line: #2b2f35;
+  --accent: #7fb6dd; --accent-soft: #1d2a35; --bar: #7fb6dd; --bar-2: #3f5f78; --warn: #f0c46b; --warn-bg: #2d2615;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "IBM Plex Sans", system-ui, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 48px 16px 64px; }
+.eyebrow { font: 500 12px/1 "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(28px, 6vw, 40px); line-height: 1.15; margin: 12px 0 12px; font-weight: 600; letter-spacing: -.01em; }
+.lede { color: var(--muted); margin: 0 0 32px; max-width: 60ch; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+label { display: block; font-weight: 500; margin-bottom: 8px; }
+.row { display: flex; gap: 8px; }
+input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.chip { font: 13px/1 "IBM Plex Mono", monospace; color: var(--accent); background: var(--accent-soft); border: 0; border-radius: 999px; padding: 8px 12px; cursor: pointer; }
+.chip:hover { filter: brightness(0.96); }
+#result { margin-top: 16px; min-height: 196px; }
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.cat { font-size: 22px; font-weight: 600; }
+.pct { font: 500 15px "IBM Plex Mono", monospace; color: var(--muted); }
+.bars { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 12px; }
+.bars li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; }
+.track { grid-column: 1 / -1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.fill { height: 100%; background: var(--bar-2); border-radius: 4px; transition: width .25s ease-out; }
+.bars li:first-child .fill { background: var(--bar); }
+.num { font-family: "IBM Plex Mono", monospace; color: var(--muted); }
+.note { margin-top: 14px; font-size: 14px; color: var(--muted); }
+.warn { margin-top: 14px; font-size: 14px; color: var(--warn); background: var(--warn-bg); border-radius: 8px; padding: 10px 12px; }
+.empty { color: var(--muted); }
+h2 { font-size: 18px; margin: 40px 0 12px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.fact b { display: block; font: 600 22px "IBM Plex Mono", monospace; }
+.fact span { font-size: 13px; color: var(--muted); }
+p.small { font-size: 14px; color: var(--muted); }
+a { color: var(--accent); }
+footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">MLOps project · runs in your browser</div>
+  <h1>Transaction classifier</h1>
+  <p class="lede">Type a retail transaction description. The page runs the trained TF-IDF, SVD and logistic regression model in JavaScript and returns a category with its top-3 probabilities. Nothing is sent to a server.</p>
+
+  <section class="card" aria-labelledby="q">
+    <label id="q" for="text">Transaction description</label>
+    <div class="row"><input id="text" autocomplete="off" spellcheck="false" placeholder="e.g. WHITE HANGING HEART T-LIGHT HOLDER" value="jumbo bag red retrospot"></div>
+    <div class="chips" aria-label="Examples">
+      <button class="chip">regency cakestand 3 tier</button>
+      <button class="chip">hot water bottle tea and sympathy</button>
+      <button class="chip">alarm clock bakelike green</button>
+      <button class="chip">60 cake cases vintage christmas</button>
+      <button class="chip">feltcraft princess doll</button>
+    </div>
+    <div id="result" aria-live="polite"><p class="empty">Loading the model…</p></div>
+  </section>
+
+  <h2>How good is it?</h2>
+  <div class="facts" id="facts"></div>
+  <p class="small">The dataset has no category labels. The categories are 56 KMeans clusters, named after their heaviest terms, and the classifier learns to reproduce them. Its accuracy against those cluster pseudo-labels measures consistency with the clustering, not real-world correctness. On 50 descriptions labelled by hand, the top-1 category was right 62% of the time when a fitting category existed (85% top-3), and 16 of the 50 had no fitting category at all. Details are in the <a href="https://github.com/Nardy11/transaction-classifier-mlops#results">README</a>.</p>
+
+  <footer>Data: <a href="https://www.kaggle.com/datasets/vipin20/transaction-data">Transaction Data</a> on Kaggle (CC0). Code: <a href="https://github.com/Nardy11/transaction-classifier-mlops">github.com/Nardy11/transaction-classifier-mlops</a> · Nardy Attaalla · ReDI School ML course project, rebuilt as an MLOps pipeline.</footer>
+</main>
+<script type="module">
+import { loadModel, predict } from "./txclf.js";
+
+const input = document.getElementById("text");
+const out = document.getElementById("result");
+const pct = (p) => (p * 100).toFixed(1) + "%";
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let model;
+
+function render() {
+  const text = input.value.trim();
+  if (!text) { out.innerHTML = '<p class="empty">Type a description to see its category.</p>'; return; }
+  const r = predict(model, text, 3);
+  const bars = r.top_k.map((t) => `<li><span>${esc(t.category)}</span><span class="num">${pct(t.probability)}</span><div class="track"><div class="fill" style="width:${(t.probability * 100).toFixed(1)}%"></div></div></li>`).join("");
+  const warn = r.known_terms === 0
+    ? '<p class="warn">None of these words are in the model\'s 5,000-term vocabulary, so this is only the model\'s prior. The training data is a UK gift retailer\'s catalogue.</p>'
+    : `<p class="note">${r.known_terms} known term${r.known_terms === 1 ? "" : "s"} matched.</p>`;
+  out.innerHTML = `<div class="top"><span class="cat">${esc(r.category)}</span><span class="pct">${pct(r.probability)}</span></div><ul class="bars">${bars}</ul>${warn}`;
+}
+
+function facts(m) {
+  const items = [
+    [m.heldout_accuracy, "pseudo-label accuracy, unseen descriptions"],
+    [m.heldout_macro_f1, "macro F1, unseen descriptions"],
+    [m.hand_accuracy_where_category_fits, "hand-labelled top-1 (n=34 that fit)"],
+    [m.hand_top3_where_category_fits, "hand-labelled top-3"],
+  ];
+  document.getElementById("facts").innerHTML = items
+    .filter(([v]) => typeof v === "number")
+    .map(([v, s]) => `<div class="fact"><b>${pct(v)}</b><span>${s}</span></div>`).join("");
+}
+
+try {
+  const res = await fetch("./model.json");
+  model = loadModel(await res.json());
+  facts(model.metrics);
+  render();
+} catch (e) {
+  out.innerHTML = '<p class="warn">The model could not be loaded. Reload the page to try again.</p>';
+}
+let t;
+input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => model && render(), 80); });
+document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { input.value = b.textContent; model && render(); input.focus(); }));
+</script>
+</body>
+</html>
