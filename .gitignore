@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+mlruns/
+mlartifacts/
+models/
+build/
+*.joblib
+# the full dataset is downloaded with kagglehub, never committed
+data/raw/
+transaction_data.csv
